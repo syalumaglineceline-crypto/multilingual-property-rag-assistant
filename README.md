@@ -1,34 +1,95 @@
 # Multilingual Property RAG Assistant
 
-A multilingual retrieval-augmented assistant for source-grounded UK property-market information.
+A multilingual Retrieval-Augmented Generation (RAG) assistant for source-grounded UK property-market information.
 
-This project is being built as a portfolio system demonstrating:
+This project demonstrates an end-to-end applied AI workflow combining multilingual semantic retrieval, vector search, LLM-based answer generation, REST API development, and a conversational user interface.
 
-- Python application development
-- multilingual semantic search
-- vector databases
-- Retrieval-Augmented Generation (RAG)
-- REST API development with FastAPI
-- user interface development with Streamlit
-- source citation and traceability
-- evaluation and responsible AI practices
+## Project Overview
 
-## Current Stage
+The assistant allows users to ask questions about indexed UK property-market documents.
 
-This first stage implements the project foundation and a working **multilingual retrieval API**.
+The workflow is:
 
-The next stage will add the LLM generation layer so the system can produce grounded answers from the retrieved sources.
+1. Source documents are loaded and split into deterministic text chunks.
+2. Chunks are converted into multilingual vector embeddings.
+3. Embeddings are stored in a persistent Chroma vector database.
+4. A user question is embedded using the same multilingual model.
+5. Semantically relevant passages are retrieved.
+6. Retrieved passages are supplied to an LLM using a source-grounded prompt.
+7. The system generates an answer with inline source references.
+8. Retrieved evidence is displayed alongside the answer for traceability.
+
+The multilingual design allows questions written in different languages to retrieve relevant information from primarily English-language source documents.
+
+## Current Capabilities
+
+The current implementation includes:
+
+* multilingual semantic retrieval
+* cross-lingual retrieval from English-language source documents
+* persistent Chroma vector storage
+* deterministic document chunking
+* PDF, TXT, and Markdown document ingestion
+* source-grounded LLM answer generation
+* inline source references
+* unsupported-answer handling
+* configurable retrieval depth
+* FastAPI REST endpoints
+* conversational Streamlit interface
+* chat-session history
+* retrieval-source inspection
+* Responsible AI documentation
+* initial automated testing
 
 ## Technology Stack
 
-- Python
-- FastAPI
-- Chroma
-- Sentence Transformers
-- multilingual MiniLM embeddings
-- Streamlit
-- PyPDF
-- pytest
+* Python
+* FastAPI
+* Chroma
+* Sentence Transformers
+* multilingual MiniLM embeddings
+* OpenAI API
+* Streamlit
+* PyPDF
+* Pydantic
+* HTTPX
+* pytest
+
+## System Architecture
+
+```text
+Source Documents
+       │
+       ▼
+Document Loader
+       │
+       ▼
+Deterministic Chunking
+       │
+       ▼
+Multilingual Embeddings
+       │
+       ▼
+Chroma Vector Database
+       │
+       ▼
+User Question
+       │
+       ▼
+Semantic Retrieval
+       │
+       ▼
+Retrieved Source Passages
+       │
+       ▼
+Grounded LLM Prompt
+       │
+       ▼
+Generated Answer + Citations
+       │
+       ▼
+FastAPI / Streamlit Interface
+```
 
 ## Repository Structure
 
@@ -48,6 +109,7 @@ multilingual-property-rag-assistant/
 │       ├── chunking.py
 │       ├── document_loader.py
 │       ├── embeddings.py
+│       ├── generator.py
 │       ├── ingest.py
 │       ├── service.py
 │       └── vector_store.py
@@ -68,63 +130,115 @@ multilingual-property-rag-assistant/
 
 ## Setup
 
-### 1. Create a virtual environment
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd multilingual-property-rag-assistant
+```
+
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-### 2. Install dependencies
+Activate the virtual environment using the command appropriate for your operating system.
+
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment variables
+### 4. Configure environment variables
 
-Copy `.env.example` to `.env`.
+Copy:
 
-The first retrieval stage does not require a paid LLM API key.
+```text
+.env.example
+```
 
-### 4. Add source documents
+to:
 
-Place `.pdf`, `.txt`, or `.md` files inside:
+```text
+.env
+```
+
+Add your OpenAI API key:
+
+```text
+OPENAI_API_KEY=your_api_key_here
+```
+
+The LLM model can also be configured using the environment settings defined in the project.
+
+Never commit your real API key or `.env` file to the repository.
+
+### 5. Add source documents
+
+Place supported source documents inside:
 
 ```text
 data/raw/
 ```
 
+Supported formats include:
+
+```text
+.pdf
+.txt
+.md
+```
+
 Only use documents that you are permitted to store and process.
 
-### 5. Build the vector index
+### 6. Build the vector index
+
+Run:
 
 ```bash
 python scripts/ingest_documents.py
 ```
 
-### 6. Start the REST API
+This loads the source documents, creates text chunks and embeddings, and stores them in the persistent Chroma vector collection.
+
+### 7. Start the REST API
+
+Run:
 
 ```bash
 uvicorn app.api:app --reload
 ```
 
-FastAPI exposes:
+The API provides:
 
 ```text
 GET  /health
 GET  /stats
 POST /retrieve
+POST /ask
 ```
 
-### 7. Start the Streamlit interface
+FastAPI interactive documentation is available through the standard `/docs` route while the API is running.
 
-In a second terminal:
+### 8. Start the Streamlit Interface
+
+Open a second terminal and run:
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-## Example Retrieval Request
+The Streamlit application sends questions to the `/ask` endpoint and displays both the generated answer and the retrieved supporting passages.
+
+## API Usage
+
+### Retrieve Relevant Passages
+
+`POST /retrieve`
+
+Example request:
 
 ```json
 {
@@ -133,52 +247,179 @@ streamlit run streamlit_app.py
 }
 ```
 
-The API returns semantically relevant source chunks and metadata.
+The endpoint returns semantically relevant document chunks together with source metadata and vector-distance information.
 
-## Development Roadmap
+### Generate a Grounded Answer
 
-### Stage 1
+`POST /ask`
 
-- project structure
-- multilingual embedding model
-- document loading
-- deterministic chunking
-- persistent Chroma vector database
-- document ingestion pipeline
-- FastAPI retrieval endpoints
-- Streamlit retrieval UI
-- initial multilingual retrieval questions
-- Responsible AI documentation
+Example request:
 
-### Stage 2
+```json
+{
+  "question": "What factors affect UK house prices?",
+  "top_k": 4
+}
+```
 
-- LLM answer generation
-- strict source-grounded prompt
-- inline citations
-- unsupported-answer refusal
-- same-language response behaviour
-- `/ask` REST endpoint
+The workflow is:
 
-### Stage 3
+```text
+Question
+   ↓
+Multilingual Embedding
+   ↓
+Chroma Retrieval
+   ↓
+Relevant Source Passages
+   ↓
+Grounded LLM Generation
+   ↓
+Answer + Supporting Sources
+```
 
-- multilingual evaluation set
-- retrieval Recall@K / MRR
-- answer faithfulness checks
-- citation correctness
-- latency measurements
-- error analysis
+The response contains:
 
-### Stage 4
+* the original question
+* the generated answer
+* the retrieved source chunks used as supporting evidence
 
-- final UI polish
-- architecture diagram
-- API examples
-- screenshots
-- model/system card
-- deployment documentation
+## Grounding Strategy
+
+The generation layer is instructed to:
+
+* answer using only the retrieved source passages
+* avoid filling information gaps using unsupported outside knowledge
+* cite retrieved passages using numbered references
+* state when the available sources do not contain enough information
+* respond in the same language as the user's question where possible
+* avoid personalised mortgage, legal, financial, investment, or property-valuation advice
+
+This design aims to reduce unsupported generation and make responses easier to inspect.
+
+## Multilingual Retrieval
+
+The project uses a multilingual Sentence Transformer embedding model so that questions written in different languages can be mapped into the same semantic vector space as the indexed documents.
+
+The initial multilingual evaluation focuses on:
+
+* English
+* Hindi
+* German
+
+The purpose is to test whether non-English questions can retrieve relevant information from primarily English-language UK property sources.
+
+For example, equivalent questions in English, Hindi, and German should ideally retrieve similar supporting passages when they express the same underlying meaning.
+
+The multilingual capability is therefore focused on **cross-lingual information retrieval**, rather than requiring a separate document collection for every supported language.
+
+## Responsible AI
+
+The system is designed as an information-retrieval and question-answering demonstration rather than a professional advisory system.
+
+Key risks considered include:
+
+* hallucinated answers
+* irrelevant retrieval
+* incomplete source coverage
+* multilingual performance differences
+* misleading citations
+* poor-quality source documents
+* sensitive or private document ingestion
+* inappropriate reliance on generated property or financial information
+
+Current mitigations include:
+
+* source-grounded prompting
+* visible retrieved evidence
+* unsupported-answer handling
+* restricted advisory behaviour
+* documented limitations
+* planned multilingual and retrieval evaluation
+
+See:
+
+```text
+docs/responsible_ai.md
+```
+
+for the detailed risk and mitigation framework.
+
+## Development Status
+
+### Stage 1 — Completed
+
+* project structure
+* multilingual embedding model
+* document loading
+* deterministic chunking
+* persistent Chroma vector database
+* document ingestion pipeline
+* FastAPI retrieval endpoint
+* Streamlit retrieval interface
+* initial multilingual retrieval questions
+* Responsible AI documentation
+
+### Stage 2 — Completed
+
+* LLM answer-generation layer
+* source-grounded generation prompt
+* inline source references
+* unsupported-answer handling
+* same-language response instruction
+* `/ask` REST endpoint
+* conversational Streamlit interface
+* supporting-source display
+
+### Stage 3 — In Progress / Planned
+
+* expanded English, Hindi, and German evaluation dataset
+* cross-lingual retrieval comparison
+* retrieval Recall@K
+* Mean Reciprocal Rank (MRR)
+* answer-faithfulness evaluation
+* citation-correctness checks
+* unsupported-question testing
+* latency measurements
+* multilingual performance comparison
+* systematic error analysis
+
+### Stage 4 — Planned
+
+* expanded automated test coverage
+* final architecture diagram
+* API examples and screenshots
+* model/system card
+* deployment configuration
+* final UI improvements
+* reproducible evaluation report
+
+## Limitations
+
+The current system is a portfolio prototype rather than a production property-information service.
+
+Current limitations include:
+
+* multilingual evaluation is still being expanded
+* retrieval quality depends on the documents indexed
+* retrieval performance may differ between English, Hindi, and German
+* citation generation is prompt-controlled rather than independently verified
+* the LLM may still produce incorrect or incomplete responses
+* the application has not yet been optimised for production-scale traffic
+* the system does not provide personalised professional advice
+
+These limitations will be investigated through the planned evaluation and testing stages.
 
 ## Responsible Use
 
-This project is an information-retrieval and question-answering demonstration. It should not be used to provide mortgage, legal, financial, property-valuation, or investment advice.
+This project is intended for technical demonstration, information retrieval, and experimentation.
 
-See `docs/responsible_ai.md` for the current risk and mitigation framework.
+It should not be used as a substitute for professional:
+
+* mortgage advice
+* financial advice
+* investment advice
+* legal advice
+* property valuation
+
+Users should verify important information against the original source documents.
