@@ -1,8 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from app.config import settings
+from app.rag.generator import AnswerGenerator
 from app.rag.service import RetrievalService
 from app.schemas import (
+    AskRequest,
+    AskResponse,
     HealthResponse,
     RetrieveRequest,
     RetrieveResponse,
@@ -12,10 +15,10 @@ from app.schemas import (
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.2.0",
     description=(
-        "Multilingual semantic retrieval API for "
-        "source-grounded UK property information."
+        "Multilingual RAG API for source-grounded "
+        "UK property information."
     ),
 )
 
@@ -53,4 +56,46 @@ def retrieve(
     return RetrieveResponse(
         question=request.question,
         results=results,
+    )
+
+
+@app.post("/ask", response_model=AskResponse)
+def ask(
+    request: AskRequest,
+) -> AskResponse:
+    service = RetrievalService()
+
+    results = service.retrieve(
+        question=request.question,
+        top_k=request.top_k,
+    )
+
+    if not results:
+        return AskResponse(
+            question=request.question,
+            answer=(
+                "I could not find enough information "
+                "in the available sources to answer this question."
+            ),
+            sources=[],
+        )
+
+    try:
+        generator = AnswerGenerator()
+
+        answer = generator.generate(
+            question=request.question,
+            chunks=results,
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc),
+        ) from exc
+
+    return AskResponse(
+        question=request.question,
+        answer=answer,
+        sources=results,
     )
