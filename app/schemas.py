@@ -20,6 +20,17 @@ class RetrieveResponse(BaseModel):
     results: list[SourceChunk]
 
 
+class AskRequest(BaseModel):
+    question: str = Field(..., min_length=2)
+    top_k: int = Field(default=4, ge=1, le=10)
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    sources: list[SourceChunk]
+
+
 class HealthResponse(BaseModel):
     status: str
     app: str
