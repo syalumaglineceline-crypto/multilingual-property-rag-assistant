@@ -1,3 +1,3 @@
-{"id": "en_01", "language": "English", "question": "What factors are associated with changes in UK house prices?", "expected_source": null}
-{"id": "hi_01", "language": "Hindi", "question": "यूके में घरों की कीमतों को कौन से कारक प्रभावित करते हैं?", "expected_source": null}
-{"id": "ml_01", "language": "Malayalam", "question": "യുകെയിലെ വീടുകളുടെ വിലയെ ബാധിക്കുന്ന പ്രധാന ഘടകങ്ങൾ എന്തൊക്കെയാണ്?", "expected_source": null}
+{"id":"en_01","language":"en","question":"What factors affect UK house prices?","expected_source":null}
+{"id":"hi_01","language":"hi","question":"UK में घरों की कीमतों को कौन से कारक प्रभावित करते हैं?","expected_source":null}
+{"id":"de_01","language":"de","question":"Welche Faktoren beeinflussen die Hauspreise in Großbritannien?","expected_source":null}
