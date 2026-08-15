@@ -2,7 +2,7 @@
 
 A multilingual Retrieval-Augmented Generation (RAG) assistant for source-grounded UK property-market information.
 
-This project demonstrates an end-to-end applied AI workflow combining multilingual semantic retrieval, vector search, LLM-based answer generation, REST API development, and a conversational user interface.
+This project demonstrates an end-to-end applied AI workflow combining multilingual semantic retrieval, vector search, multilingual reranking, LLM-based answer generation, REST API development, and a conversational user interface.
 
 ## Project Overview
 
@@ -14,10 +14,11 @@ The workflow is:
 2. Chunks are converted into multilingual vector embeddings.
 3. Embeddings are stored in a persistent Chroma vector database.
 4. A user question is embedded using the same multilingual model.
-5. Semantically relevant passages are retrieved.
-6. Retrieved passages are supplied to an LLM using a source-grounded prompt.
-7. The system generates an answer with inline source references.
-8. Retrieved evidence is displayed alongside the answer for traceability.
+5. Semantically relevant candidate passages are retrieved.
+6. A multilingual cross-encoder reranks the retrieved candidates.
+7. The highest-ranked passages are supplied to an LLM using a source-grounded prompt.
+8. The system generates an answer with inline source references.
+9. Retrieved evidence is displayed alongside the answer for traceability.
 
 The multilingual design allows questions written in different languages to retrieve relevant information from primarily English-language source documents.
 
@@ -25,69 +26,74 @@ The multilingual design allows questions written in different languages to retri
 
 The current implementation includes:
 
-* multilingual semantic retrieval
-* cross-lingual retrieval from English-language source documents
-* persistent Chroma vector storage
-* deterministic document chunking
-* PDF, TXT, and Markdown document ingestion
-* source-grounded LLM answer generation
-* inline source references
-* unsupported-answer handling
-* configurable retrieval depth
-* FastAPI REST endpoints
-* conversational Streamlit interface
-* chat-session history
-* retrieval-source inspection
-* Responsible AI documentation
-* initial automated testing
+- multilingual semantic retrieval
+- cross-lingual retrieval from English-language source documents
+- multilingual cross-encoder reranking of retrieved passages
+- persistent Chroma vector storage
+- deterministic document chunking
+- PDF, TXT, and Markdown document ingestion
+- source-grounded LLM answer generation
+- inline source references
+- unsupported-answer handling
+- configurable retrieval depth
+- FastAPI REST endpoints
+- conversational Streamlit interface
+- chat-session history
+- retrieval-source inspection
+- Responsible AI documentation
+- initial automated testing
 
 ## Technology Stack
 
-* Python
-* FastAPI
-* Chroma
-* Sentence Transformers
-* multilingual MiniLM embeddings
-* OpenAI API
-* Streamlit
-* PyPDF
-* Pydantic
-* HTTPX
-* pytest
+- Python
+- FastAPI
+- Chroma
+- Sentence Transformers
+- multilingual MiniLM embeddings
+- multilingual CrossEncoder reranking
+- OpenAI API
+- Streamlit
+- PyPDF
+- Pydantic
+- HTTPX
+- pytest
 
 ## System Architecture
 
 ```text
 Source Documents
-       │
-       ▼
+       |
+       v
 Document Loader
-       │
-       ▼
+       |
+       v
 Deterministic Chunking
-       │
-       ▼
+       |
+       v
 Multilingual Embeddings
-       │
-       ▼
+       |
+       v
 Chroma Vector Database
-       │
-       ▼
+       |
+       v
 User Question
-       │
-       ▼
-Semantic Retrieval
-       │
-       ▼
-Retrieved Source Passages
-       │
-       ▼
+       |
+       v
+Semantic Candidate Retrieval
+       |
+       v
+Multilingual Cross-Encoder Reranking
+       |
+       v
+Top Retrieved Source Passages
+       |
+       v
 Grounded LLM Prompt
-       │
-       ▼
+       |
+       v
 Generated Answer + Citations
-       │
-       ▼
+       |
+       v
 FastAPI / Streamlit Interface
 ```
 
@@ -111,6 +117,7 @@ multilingual-property-rag-assistant/
 │       ├── embeddings.py
 │       ├── generator.py
 │       ├── ingest.py
+│       ├── reranker.py
 │       ├── service.py
 │       └── vector_store.py
 ├── scripts/
@@ -133,7 +140,7 @@ multilingual-property-rag-assistant/
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/syalumaglineceline-crypto/multilingual-property-rag-assistant.git
 cd multilingual-property-rag-assistant
 ```
 
@@ -169,9 +176,8 @@ Add your OpenAI API key:
 
 ```text
 OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-5-mini
 ```
-
-The LLM model can also be configured using the environment settings defined in the project.
 
 Never commit your real API key or `.env` file to the repository.
 
@@ -198,7 +204,7 @@ Only use documents that you are permitted to store and process.
 Run:
 
 ```bash
-python scripts/ingest_documents.py
+python -m scripts.ingest_documents
 ```
 
 This loads the source documents, creates text chunks and embeddings, and stores them in the persistent Chroma vector collection.
@@ -208,7 +214,7 @@ This loads the source documents, creates text chunks and embeddings, and stores 
 Run:
 
 ```bash
-uvicorn app.api:app --reload
+python -m uvicorn app.api:app --reload
 ```
 
 The API provides:
@@ -247,7 +253,7 @@ Example request:
 }
 ```
 
-The endpoint returns semantically relevant document chunks together with source metadata and vector-distance information.
+The endpoint performs multilingual semantic retrieval, reranks candidate passages using a multilingual cross-encoder, and returns the highest-ranked source chunks with metadata and vector-distance information.
 
 ### Generate a Grounded Answer
 
@@ -269,9 +275,11 @@ Question
    ↓
 Multilingual Embedding
    ↓
-Chroma Retrieval
+Chroma Candidate Retrieval
    ↓
-Relevant Source Passages
+Multilingual Cross-Encoder Reranking
+   ↓
+Top Relevant Source Passages
    ↓
 Grounded LLM Generation
    ↓
@@ -280,20 +288,20 @@ Answer + Supporting Sources
 
 The response contains:
 
-* the original question
-* the generated answer
-* the retrieved source chunks used as supporting evidence
+- the original question
+- the generated answer
+- the retrieved source chunks used as supporting evidence
 
 ## Grounding Strategy
 
 The generation layer is instructed to:
 
-* answer using only the retrieved source passages
-* avoid filling information gaps using unsupported outside knowledge
-* cite retrieved passages using numbered references
-* state when the available sources do not contain enough information
-* respond in the same language as the user's question where possible
-* avoid personalised mortgage, legal, financial, investment, or property-valuation advice
+- answer using only the retrieved source passages
+- avoid filling information gaps using unsupported outside knowledge
+- cite retrieved passages using numbered references
+- state when the available sources do not contain enough information
+- respond in the same language as the user's question where possible
+- avoid personalised mortgage, legal, financial, investment, or property-valuation advice
 
 This design aims to reduce unsupported generation and make responses easier to inspect.
 
@@ -301,17 +309,29 @@ This design aims to reduce unsupported generation and make responses easier to i
 
 The project uses a multilingual Sentence Transformer embedding model so that questions written in different languages can be mapped into the same semantic vector space as the indexed documents.
 
+A multilingual cross-encoder is then used as a second-stage reranker to improve the ordering of retrieved candidate passages.
+
 The initial multilingual evaluation focuses on:
 
-* English
-* Hindi
-* German
+- English
+- Hindi
+- German
 
 The purpose is to test whether non-English questions can retrieve relevant information from primarily English-language UK property sources.
 
 For example, equivalent questions in English, Hindi, and German should ideally retrieve similar supporting passages when they express the same underlying meaning.
 
-The multilingual capability is therefore focused on **cross-lingual information retrieval**, rather than requiring a separate document collection for every supported language.
+The multilingual capability is therefore focused on cross-lingual information retrieval rather than requiring a separate document collection for every supported language.
+
+## Preliminary Retrieval Validation
+
+A preliminary cross-lingual retrieval check was performed using equivalent questions in English, Hindi, and German against primarily English-language source documents.
+
+For a test question asking for the average UK house price in May 2026, the correct ONS passage containing the £271,000 figure was initially ranked fifth by semantic retrieval.
+
+After introducing second-stage multilingual cross-encoder reranking, the correct passage was returned at rank 2 for the equivalent English, Hindi, and German queries.
+
+This is an initial functional check rather than a full evaluation. A larger multilingual evaluation set and formal retrieval metrics are planned.
 
 ## Responsible AI
 
@@ -319,23 +339,24 @@ The system is designed as an information-retrieval and question-answering demons
 
 Key risks considered include:
 
-* hallucinated answers
-* irrelevant retrieval
-* incomplete source coverage
-* multilingual performance differences
-* misleading citations
-* poor-quality source documents
-* sensitive or private document ingestion
-* inappropriate reliance on generated property or financial information
+- hallucinated answers
+- irrelevant retrieval
+- incomplete source coverage
+- multilingual performance differences
+- misleading citations
+- poor-quality source documents
+- sensitive or private document ingestion
+- inappropriate reliance on generated property or financial information
 
 Current mitigations include:
 
-* source-grounded prompting
-* visible retrieved evidence
-* unsupported-answer handling
-* restricted advisory behaviour
-* documented limitations
-* planned multilingual and retrieval evaluation
+- source-grounded prompting
+- visible retrieved evidence
+- unsupported-answer handling
+- multilingual reranking
+- restricted advisory behaviour
+- documented limitations
+- planned multilingual and retrieval evaluation
 
 See:
 
@@ -349,50 +370,52 @@ for the detailed risk and mitigation framework.
 
 ### Stage 1 — Completed
 
-* project structure
-* multilingual embedding model
-* document loading
-* deterministic chunking
-* persistent Chroma vector database
-* document ingestion pipeline
-* FastAPI retrieval endpoint
-* Streamlit retrieval interface
-* initial multilingual retrieval questions
-* Responsible AI documentation
+- project structure
+- multilingual embedding model
+- document loading
+- deterministic chunking
+- persistent Chroma vector database
+- document ingestion pipeline
+- FastAPI retrieval endpoint
+- Streamlit retrieval interface
+- initial multilingual retrieval questions
+- Responsible AI documentation
 
 ### Stage 2 — Completed
 
-* LLM answer-generation layer
-* source-grounded generation prompt
-* inline source references
-* unsupported-answer handling
-* same-language response instruction
-* `/ask` REST endpoint
-* conversational Streamlit interface
-* supporting-source display
+- LLM answer-generation layer
+- source-grounded generation prompt
+- inline source references
+- unsupported-answer handling
+- same-language response instruction
+- multilingual cross-encoder reranking
+- second-stage retrieval refinement
+- `/ask` REST endpoint
+- conversational Streamlit interface
+- supporting-source display
 
-### Stage 3 — In Progress / Planned
+### Stage3 Future Engineering Enhancements
 
-* expanded English, Hindi, and German evaluation dataset
-* cross-lingual retrieval comparison
-* retrieval Recall@K
-* Mean Reciprocal Rank (MRR)
-* answer-faithfulness evaluation
-* citation-correctness checks
-* unsupported-question testing
-* latency measurements
-* multilingual performance comparison
-* systematic error analysis
+- expanded English, Hindi, and German evaluation dataset
+- cross-lingual retrieval comparison
+- retrieval Recall@K
+- Mean Reciprocal Rank (MRR)
+- answer-faithfulness evaluation
+- citation-correctness checks
+- unsupported-question testing
+- latency measurements
+- multilingual performance comparison
+- systematic error analysis
 
-### Stage 4 — Planned
+### Stage 4 — Future Engineering Enhancements
 
-* expanded automated test coverage
-* final architecture diagram
-* API examples and screenshots
-* model/system card
-* deployment configuration
-* final UI improvements
-* reproducible evaluation report
+- expanded automated test coverage
+- final architecture diagram
+- API examples and screenshots
+- model/system card
+- deployment configuration
+- final UI improvements
+- reproducible evaluation report
 
 ## Limitations
 
@@ -400,13 +423,13 @@ The current system is a portfolio prototype rather than a production property-in
 
 Current limitations include:
 
-* multilingual evaluation is still being expanded
-* retrieval quality depends on the documents indexed
-* retrieval performance may differ between English, Hindi, and German
-* citation generation is prompt-controlled rather than independently verified
-* the LLM may still produce incorrect or incomplete responses
-* the application has not yet been optimised for production-scale traffic
-* the system does not provide personalised professional advice
+- multilingual evaluation is still being expanded
+- retrieval quality depends on the documents indexed
+- retrieval performance may differ between English, Hindi, and German
+- citation generation is prompt-controlled rather than independently verified
+- the LLM may still produce incorrect or incomplete responses
+- the application has not yet been optimised for production-scale traffic
+- the system does not provide personalised professional advice
 
 These limitations will be investigated through the planned evaluation and testing stages.
 
@@ -416,10 +439,10 @@ This project is intended for technical demonstration, information retrieval, and
 
 It should not be used as a substitute for professional:
 
-* mortgage advice
-* financial advice
-* investment advice
-* legal advice
-* property valuation
+- mortgage advice
+- financial advice
+- investment advice
+- legal advice
+- property valuation
 
 Users should verify important information against the original source documents.
